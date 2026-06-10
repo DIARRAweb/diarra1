@@ -332,6 +332,27 @@ min="1"
 <div id="preview" class="preview-box"></div>
 </div>
 
+<!-- AJOUT IMAGE DASHBOARD -->
+<div class="card">
+<h2>🖼 Déployer une image Dashboard</h2>
+
+<input type="file" id="dashboardFileInput" accept="image/*">
+
+<button class="btn-full" onclick="uploadDashboardBanner()">
+📤 Upload Image Dashboard
+</button>
+
+<div id="dashboardPreview" class="preview-box"></div>
+</div>
+
+<h2 class="section-title" onclick="toggleDashboardBannersBox()">
+🖼 Images Dashboard publiées ⬇
+</h2>
+
+<div id="dashboardBannersBox">
+  <div class="grid" id="dashboardBannersList"></div>
+</div>
+
 <!-- LISTE PUBS -->
 <h2 class="section-title" onclick="toggleAdsBox()">
 📂 Pubs enregistrées ⬇
@@ -615,6 +636,112 @@ document.getElementById("adsBox")
 ========================= */
 window.goBack = function(){
 window.location.href = "admin.html";
+};
+
+const dashboardFileInput = document.getElementById("dashboardFileInput");
+const dashboardPreview = document.getElementById("dashboardPreview");
+
+dashboardFileInput.addEventListener("change", () => {
+  const file = dashboardFileInput.files[0];
+  if(!file) return;
+
+  const url = URL.createObjectURL(file);
+  dashboardPreview.innerHTML = `<img src="${url}">`;
+});
+
+window.uploadDashboardBanner = function(){
+  const file = dashboardFileInput.files[0];
+
+  if(!file){
+    alert("❌ Choisis une image");
+    return;
+  }
+
+  if(!file.type.includes("image")){
+    alert("❌ Seules les images sont acceptées pour le dashboard");
+    return;
+  }
+
+  alert("⏳ Upload image dashboard...");
+
+  const id = Date.now();
+
+  const refStorage =
+    storage.ref("dashboardBanners/" + id + "_" + file.name);
+
+  refStorage.put(file)
+  .then(async snapshot => {
+    const url = await snapshot.ref.getDownloadURL();
+
+    await db.ref("dashboardBanners/" + id).set({
+      url: url,
+      type: "image",
+      duration: 10000,
+      order: id,
+      createdAt: Date.now()
+    });
+
+    alert("✅ Image dashboard déployée !");
+
+    dashboardFileInput.value = "";
+    dashboardPreview.innerHTML = "";
+  })
+  .catch(e => {
+    console.error(e);
+    alert("❌ " + e.message);
+  });
+};
+
+const dashboardBannersList =
+document.getElementById("dashboardBannersList");
+
+function loadDashboardBanners(){
+  db.ref("dashboardBanners").on("value", snap => {
+    dashboardBannersList.innerHTML = "";
+
+    const data = snap.val();
+
+    if(!data){
+      dashboardBannersList.innerHTML =
+      `<div class="card empty">Aucune image Dashboard publiée</div>`;
+      return;
+    }
+
+    Object.entries(data)
+    .reverse()
+    .forEach(([id, banner]) => {
+      dashboardBannersList.innerHTML += `
+        <div class="card">
+          <img class="ad-media" src="${banner.url}">
+
+          <div class="ad-info">
+            🕒 Défilement : ${(banner.duration || 10000) / 1000} secondes
+          </div>
+
+          <div class="badge">🖼 Image Dashboard</div>
+
+          <button class="btn-delete" onclick="deleteDashboardBanner('${id}')">
+            🗑 Supprimer
+          </button>
+        </div>
+      `;
+    });
+  });
+}
+
+loadDashboardBanners();
+
+window.deleteDashboardBanner = function(id){
+  if(!confirm("Supprimer cette image Dashboard ?")) return;
+
+  db.ref("dashboardBanners/" + id).remove();
+
+  alert("✅ Image Dashboard supprimée");
+};
+
+window.toggleDashboardBannersBox = function(){
+  document.getElementById("dashboardBannersBox")
+  .classList.toggle("hidden");
 };
 </script>
 
