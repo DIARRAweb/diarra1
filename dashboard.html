@@ -8644,46 +8644,140 @@ body{
 }
 
 /* ===============================
-   MALI WARI — SLIDER PUBLICITÉ
+   MALI WARI — CARTE IMAGE DASHBOARD PREMIUM
 ================================ */
 
 .promo-slider{
   width:100%;
-  height:135px;
-  margin:16px 0;
-  border-radius:26px;
+  height:150px;
+  margin:0 0 16px;
+  border-radius:30px;
   overflow:hidden;
-  background:linear-gradient(145deg,#0d3b66,#16a34a);
-  box-shadow:0 18px 42px rgba(13,59,102,.25);
+  position:relative;
+  background:#000 !important;
+  box-shadow:
+    0 20px 45px rgba(13,59,102,.28),
+    inset 0 1px 0 rgba(255,255,255,.25);
+  touch-action:pan-y;
+}
+
+.promo-slide-track{
+  width:100%;
+  height:100%;
   position:relative;
 }
 
-.promo-slider img{
+.promo-slide{
+  position:absolute;
+  inset:0;
   width:100%;
   height:100%;
   object-fit:cover;
-  display:block;
+  opacity:0;
+  transform:translateX(100%);
+  transition:
+    transform 1.45s cubic-bezier(.22,.8,.25,1),
+    opacity 1.45s ease;
+  z-index:1;
+}
+
+.promo-slide.active{
+  opacity:1;
+  transform:translateX(0);
+  z-index:2;
+}
+
+.promo-slide.exit-left{
+  opacity:1;
+  transform:translateX(-100%);
+  z-index:1;
+}
+
+.promo-slide.exit-right{
+  opacity:1;
+  transform:translateX(100%);
+  z-index:1;
+}
+
+.promo-slide.enter-left{
+  opacity:1;
+  transform:translateX(-100%);
+}
+
+.promo-slide.enter-right{
+  opacity:1;
+  transform:translateX(100%);
+}
+
+@keyframes promoFromLeft{
+  from{opacity:0;transform:translateX(-100%) scale(1.04);}
+  to{opacity:1;transform:translateX(0) scale(1);}
+}
+
+@keyframes promoFromRight{
+  from{opacity:0;transform:translateX(100%) scale(1.04);}
+  to{opacity:1;transform:translateX(0) scale(1);}
+}
+
+@keyframes promoFromBottom{
+  from{opacity:0;transform:translateY(100%) scale(1.04);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+
+@keyframes promoFromTop{
+  from{opacity:0;transform:translateY(-100%) scale(1.04);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+
+.promo-shine{
+  position:absolute;
+  inset:0;
+  background:linear-gradient(
+    110deg,
+    transparent 20%,
+    rgba(255,255,255,.25) 45%,
+    transparent 70%
+  );
+  transform:translateX(-120%);
+  animation:promoShine 4s ease-in-out infinite;
+  z-index:3;
+  pointer-events:none;
+}
+
+@keyframes promoShine{
+  0%,55%{transform:translateX(-120%);}
+  100%{transform:translateX(120%);}
 }
 
 .promo-dots{
   position:absolute;
-  bottom:10px;
+  bottom:11px;
   left:0;
   right:0;
   display:flex;
   justify-content:center;
   gap:7px;
+  z-index:4;
 }
 
 .promo-dots span{
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  background:rgba(255,255,255,.45);
+  width:7px;
+  height:7px;
+  border-radius:999px;
+  background:rgba(255,255,255,.55);
+  transition:.3s ease;
 }
 
 .promo-dots span.active{
+  width:22px;
   background:#16a34a;
+}
+
+@media(max-width:520px){
+  .promo-slider{
+    height:135px;
+    border-radius:26px;
+  }
 }
 </style>
 </head>
@@ -8747,8 +8841,9 @@ body{
 <section class="dashboard-box">
 
   <!-- 🎯 SLIDER PUB / EVENEMENTS -->
-<div class="promo-slider">
-  <img id="promoImage" src="" alt="Publicité Mali Wari">
+<div class="promo-slider" id="promoSlider">
+  <div class="promo-slide-track" id="promoSlideTrack"></div>
+  <div class="promo-shine"></div>
   <div class="promo-dots" id="promoDots"></div>
 </div>
 
@@ -9307,6 +9402,15 @@ const auth = getAuth(app);
 let promoList = [];
 let promoIndex = 0;
 let promoTimer = null;
+let promoTouchStartX = 0;
+let promoTouchEndX = 0;
+
+const promoAnimations = [
+  "from-left",
+  "from-bottom",
+  "from-right",
+  "from-top"
+];
 
 function renderPromoDots(){
   const dots = document.getElementById("promoDots");
@@ -9317,13 +9421,39 @@ function renderPromoDots(){
   }).join("");
 }
 
-function showPromo(){
-  const img = document.getElementById("promoImage");
-  if(!img || promoList.length === 0) return;
+function showPromo(direction = 1){
+  const track = document.getElementById("promoSlideTrack");
+  if(!track || promoList.length === 0) return;
 
+  const oldSlide = track.querySelector(".promo-slide.active");
   const promo = promoList[promoIndex];
 
-  img.src = promo.url;
+  const newSlide = document.createElement("img");
+  newSlide.className =
+    "promo-slide " + (direction === 1 ? "enter-right" : "enter-left");
+
+  newSlide.src = promo.url;
+  newSlide.alt = "Publicité Mali Wari";
+  newSlide.draggable = false;
+
+  track.appendChild(newSlide);
+
+  requestAnimationFrame(() => {
+    if(oldSlide){
+      oldSlide.classList.remove("active");
+      oldSlide.classList.add(direction === 1 ? "exit-left" : "exit-right");
+    }
+
+    newSlide.classList.remove("enter-right","enter-left");
+    newSlide.classList.add("active");
+  });
+
+  setTimeout(() => {
+    [...track.querySelectorAll(".promo-slide")]
+      .forEach(slide => {
+        if(!slide.classList.contains("active")) slide.remove();
+      });
+  }, 1600);
 
   renderPromoDots();
 
@@ -9331,11 +9461,49 @@ function showPromo(){
 
   promoTimer = setTimeout(() => {
     promoIndex = (promoIndex + 1) % promoList.length;
-    showPromo();
-  }, Number(promo.duration || 5000));
+    showPromo(1);
+  }, 10000);
 }
 
-onValue(ref(db, "adsBanners"), snap => {
+function nextPromo(){
+  if(promoList.length <= 1) return;
+  promoIndex = (promoIndex + 1) % promoList.length;
+  showPromo(1);
+}
+
+function prevPromo(){
+  if(promoList.length <= 1) return;
+  promoIndex =
+    (promoIndex - 1 + promoList.length) % promoList.length;
+  showPromo(-1);
+}
+
+function setupPromoSwipe(){
+  const slider = document.getElementById("promoSlider");
+  if(!slider) return;
+
+  slider.addEventListener("touchstart", e => {
+    promoTouchStartX = e.touches[0].clientX;
+  }, {passive:true});
+
+  slider.addEventListener("touchend", e => {
+    promoTouchEndX = e.changedTouches[0].clientX;
+
+    const diff = promoTouchEndX - promoTouchStartX;
+
+    if(Math.abs(diff) < 45) return;
+
+    if(diff < 0){
+      nextPromo();
+    }else{
+      prevPromo();
+    }
+  }, {passive:true});
+}
+
+setupPromoSwipe();
+
+onValue(ref(db, "dashboardBanners"), snap => {
   const data = snap.val();
 
   if(!data){
@@ -9343,6 +9511,8 @@ onValue(ref(db, "adsBanners"), snap => {
       url: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d",
       duration: 5000
     }];
+
+    promoIndex = 0;
     showPromo();
     return;
   }
@@ -9434,13 +9604,30 @@ switchMedia();
 // 🔥 démarrage
 restartSlider();
 
-// 🔥 Firebase sync
-onValue(ref(db, "ads"), snap => {
-const data = snap.val();
-if (!data) return;
+// ✅ DASHBOARD : ne récupère plus les anciennes vidéos "ads"
+// ✅ Il récupère maintenant les fichiers/images publiés par pub.html
+onValue(ref(db, "dashboardBanners"), snap => {
+  const data = snap.val();
 
-maliMedia = Object.values(data);
-restartSlider();
+  if(!data){
+    promoList = [{
+      url: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d",
+      duration: 10000
+    }];
+    showPromo();
+    return;
+  }
+
+  promoList = Object.values(data)
+    .filter(item => item.url)
+    .sort((a,b) => Number(a.order || 0) - Number(b.order || 0))
+    .map(item => ({
+      url: item.url,
+      duration: 10000
+    }));
+
+  promoIndex = 0;
+  showPromo();
 });
 
 let currentUser = JSON.parse(localStorage.getItem("loggedUser"));
