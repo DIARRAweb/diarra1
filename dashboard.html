@@ -8790,6 +8790,15 @@ body{
     border-radius:26px;
   }
 }
+
+#bgVideo,
+#bgImage{
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  object-fit:cover !important;
+}
 </style>
 </head>
 
@@ -9536,7 +9545,7 @@ onValue(ref(db, "dashboardBanners"), snap => {
   showPromo();
 });
 
-// ================= BACKGROUND DYNAMIQUE =================
+// ================= BACKGROUND DYNAMIQUE — COMME INDEX.HTML =================
 const video = document.getElementById("bgVideo");
 const image = document.getElementById("bgImage");
 const toggleAudioBtn = document.getElementById("toggleAudio");
@@ -9544,101 +9553,102 @@ const toggleAudioBtn = document.getElementById("toggleAudio");
 let isMuted = true;
 let currentIsVideo = false;
 
-// 🔊 bouton audio
-toggleAudioBtn.addEventListener("click", () => {
-isMuted = !isMuted;
-if(currentIsVideo){
-video.muted = isMuted;
-}
-toggleAudioBtn.textContent = isMuted ? "🔇" : "🔊";
-});
-
-// 🔥 fallback
-let maliMedia = [
-{type:"image", url:"https://images.unsplash.com/photo-1600172454520-134a542d7c97"},
-{type:"video", url:"https://cdn.pixabay.com/video/2018/10/09/18675-297657059_large.mp4"}
+let mediaList = [
+  {
+    type:"image",
+    url:"https://images.unsplash.com/photo-1600172454520-134a542d7c97",
+    duration:10
+  },
+  {
+    type:"video",
+    url:"https://cdn.pixabay.com/video/2018/10/09/18675-297657059_large.mp4",
+    duration:10
+  }
 ];
 
 let index = 0;
 let currentTimeout;
 
 function switchMedia(){
-if (!maliMedia.length) return;
+  if(!mediaList.length) return;
 
-clearTimeout(currentTimeout);
+  clearTimeout(currentTimeout);
 
-const ad = maliMedia[index];
+  const ad = mediaList[index];
 
-// 🎬 VIDEO
-if (ad.type === "video") {
-video.src = ad.url;
-video.style.display = "block";
-image.style.display = "none";
+  if(ad.type === "video"){
+    image.style.display = "none";
+    video.style.display = "block";
 
-video.muted = isMuted;
-currentIsVideo = true;
+    video.src = ad.url;
+    video.muted = isMuted;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.loop = false;
 
-video.onloadedmetadata = () => {
-video.play().catch(()=>{});
-const duration = ad.duration || video.duration || 10;
+    currentIsVideo = true;
 
-currentTimeout = setTimeout(() => {
-index = (index + 1) % maliMedia.length;
-switchMedia();
-}, duration * 1000);
-};
+    video.onloadedmetadata = () => {
+      video.play().catch(()=>{});
+
+      const duration = Number(ad.duration || video.duration || 10);
+
+      currentTimeout = setTimeout(() => {
+        index = (index + 1) % mediaList.length;
+        switchMedia();
+      }, duration * 1000);
+    };
+
+    video.onerror = () => {
+      index = (index + 1) % mediaList.length;
+      switchMedia();
+    };
+
+  }else{
+    video.pause();
+    video.style.display = "none";
+    image.style.display = "block";
+    image.src = ad.url;
+
+    currentIsVideo = false;
+
+    const duration = Number(ad.duration || 10);
+
+    currentTimeout = setTimeout(() => {
+      index = (index + 1) % mediaList.length;
+      switchMedia();
+    }, duration * 1000);
+  }
 }
 
-// 🖼 IMAGE
-else {
-image.src = ad.url;
-image.style.display = "block";
-video.style.display = "none";
-
-currentIsVideo = false;
-
-const duration = ad.duration || 10;
-
-currentTimeout = setTimeout(() => {
-index = (index + 1) % maliMedia.length;
-switchMedia();
-}, duration * 1000);
-}
-}
-
-// 🔄 restart
 function restartSlider(){
-index = 0;
-switchMedia();
+  index = 0;
+  switchMedia();
 }
 
-// 🔥 démarrage
-restartSlider();
+toggleAudioBtn.addEventListener("click", () => {
+  isMuted = !isMuted;
 
-// ✅ DASHBOARD : ne récupère plus les anciennes vidéos "ads"
-// ✅ Il récupère maintenant les fichiers/images publiés par pub.html
-onValue(ref(db, "dashboardBanners"), snap => {
-  const data = snap.val();
-
-  if(!data){
-    promoList = [{
-      url: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d",
-      duration: 10000
-    }];
-    showPromo();
-    return;
+  if(currentIsVideo){
+    video.muted = isMuted;
+    video.play().catch(()=>{});
   }
 
-  promoList = Object.values(data)
-    .filter(item => item.url)
-    .sort((a,b) => Number(a.order || 0) - Number(b.order || 0))
-    .map(item => ({
-      url: item.url,
-      duration: 10000
-    }));
+  toggleAudioBtn.textContent = isMuted ? "🔇" : "🔊";
+});
 
-  promoIndex = 0;
-  showPromo();
+switchMedia();
+
+// 🔥 ADS FIREBASE — arrière-plan dashboard
+onValue(ref(db,"ads"), snap => {
+  const data = snap.val();
+
+  if(!data) return;
+
+  mediaList = Object.values(data)
+    .filter(ad => ad.url && ad.type);
+
+  restartSlider();
 });
 
 let currentUser = JSON.parse(localStorage.getItem("loggedUser"));
